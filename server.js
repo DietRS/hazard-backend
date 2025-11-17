@@ -7,8 +7,17 @@ const HazardForm = require('./models/HazardForm');
 
 const app = express();
 app.use(express.json({ limit: '10mb' }));
-app.use(cors({ origin: 'http://192.168.1.75:3000' })); // allow your phone frontend
 
+// ✅ Allow local dev + Vercel frontend
+app.use(cors({
+  origin: [
+    "http://localhost:3000", // dev
+    "https://hazard-frontend.vercel.app" // deployed frontend
+  ],
+  methods: ["GET", "POST"]
+}));
+
+// ✅ MongoDB Atlas connection
 mongoose.connect(process.env.MONGO_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
@@ -16,13 +25,20 @@ mongoose.connect(process.env.MONGO_URI, {
   serverSelectionTimeoutMS: 30000
 })
 .then(() => console.log('✅ MongoDB connected'))
-.catch(err => console.error('❌ MongoDB connection error:', err.message));
+.catch(err => console.error('❌ MongoDB connection error:', err));
 
+// ✅ Nodemailer setup
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_PASS }
 });
 
+// ✅ Health check route
+app.get("/health", (req, res) => {
+  res.send("Backend is running on Vercel");
+});
+
+// ✅ Hazard form submission route
 app.post('/submit-form', async (req, res) => {
   try {
     const {
@@ -42,10 +58,12 @@ app.post('/submit-form', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Missing required fields' });
     }
 
+    // Generate unique form number
     const today = new Date();
     const ymd = `${today.getFullYear()}${String(today.getMonth()+1).padStart(2,'0')}${String(today.getDate()).padStart(2,'0')}`;
     const formNumber = `${ymd}-${Math.floor(Math.random() * 9000 + 1000)}`;
 
+    // Save to MongoDB
     const doc = new HazardForm({
       formNumber, company, location, jobDescription, date,
       hazards, hazardControls, ppe, additionalHazards, additionalControls,
@@ -56,6 +74,7 @@ app.post('/submit-form', async (req, res) => {
 
     const saved = await doc.save();
 
+    // Build email
     const mailOptions = {
       from: process.env.GMAIL_USER,
       to: process.env.NOTIFY_TO || process.env.GMAIL_USER,
@@ -109,12 +128,18 @@ app.post('/submit-form', async (req, res) => {
     };
 
     await transporter.sendMail(mailOptions);
+
     res.status(200).json({ success: true, formNumber, id: saved._id.toString() });
   } catch (err) {
-    console.error('❌ Error in /submit-form:', err.message);
+    console.error('❌ Error in /submit-form:', err); // full error for debugging
     res.status(500).json({ success: false, error: 'Server error' });
   }
 });
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`🚀 HazardApp backend running on port ${PORT}`));
+// ✅ Health check route
+app.get("/health", (req, res) => {
+  res.send("Backend is running on Vercel");
+});
+
+// ✅ Export for Vercel
+module.exports = app;
