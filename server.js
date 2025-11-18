@@ -3,7 +3,7 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
-const nodemailer = require("nodemailer");   // ✅ Gmail SMTP
+const axios = require("axios");   // ✅ Brevo API
 const HazardForm = require("./models/HazardForm");
 
 const app = express();
@@ -35,34 +35,34 @@ app.get("/ping", (req, res) => {
   res.json({ message: "Backend is reachable" });
 });
 
-// ✅ Gmail email helper
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.GMAIL_USER,
-    pass: process.env.GMAIL_PASS,
-  },
-});
+// ✅ Brevo email helper
+async function sendEmail({ to, subject, html }) {
+  try {
+    await axios.post("https://api.brevo.com/v3/smtp/email", {
+      sender: { email: process.env.NOTIFY_FROM },   // must be verified in Brevo
+      to: [{ email: to }],
+      subject,
+      htmlContent: html
+    }, {
+      headers: { "api-key": process.env.BREVO_API_KEY }
+    });
+    console.log("✅ Email sent via Brevo");
+  } catch (err) {
+    console.error("❌ Error sending email via Brevo:", err.response?.data || err.message);
+  }
+}
 
 // ✅ Hazard form submission route
 app.post("/submit-form", async (req, res) => {
   try {
-    // Extract representative company prefix
     const prefix = (req.body.representativeCompany || "GEN")
       .substring(0, 3)
       .toUpperCase();
-
-    // Generate unique form number with prefix
     const formNumber = `${prefix}-${Date.now()}`;
 
-    // Save to MongoDB
-    const hazardForm = new HazardForm({
-      ...req.body,
-      formNumber
-    });
+    const hazardForm = new HazardForm({ ...req.body, formNumber });
     await hazardForm.save();
 
-    // Build email HTML
     const html = `
       <h2 style="text-align:center;">SITE SPECIFIC HAZARD ASSESSMENT</h2>
       <table style="width:100%; border-collapse:collapse; margin-bottom:20px;">
@@ -144,23 +144,13 @@ app.post("/submit-form", async (req, res) => {
       </table>
     `;
 
-    // Send email via Gmail SMTP
-    const mailOptions = {
-      from: process.env.GMAIL_USER,
+    await sendEmail({
       to: process.env.NOTIFY_TO,
       subject: `Hazard Assessment Form ${formNumber}`,
-      html,
-    };
-
-    transporter.sendMail(mailOptions, (error, info) => {
-      if (error) {
-        console.error("❌ Error sending email:", error);
-        res.status(500).json({ success: false, error: "Email failed" });
-      } else {
-        console.log("✅ Email sent via Gmail:", info.response);
-        res.json({ success: true, formNumber });
-      }
+      html
     });
+
+    res.json({ success: true, formNumber });
   } catch (err) {
     console.error("❌ Error submitting form:", err);
     res.status(500).json({ success: false, error: "Submission failed" });
@@ -174,6 +164,5 @@ mongoose.connect(process.env.MONGO_URI, {
 }).then(() => console.log("✅ Connected to MongoDB"))
   .catch(err => console.error("❌ MongoDB connection error:", err));
 
-// Start server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
