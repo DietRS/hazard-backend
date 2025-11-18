@@ -71,63 +71,87 @@ app.post("/submit-form", async (req, res) => {
     await hazardForm.save();
 
     // Build email HTML
-    const html = `
-      <h2>Site Specific Hazard Assessment</h2>
-      <p><strong>Company:</strong> ${req.body.company}</p>
-      <p><strong>Job Description:</strong> ${req.body.jobDescription}</p>
-      <p><strong>Location:</strong> ${req.body.location}</p>
-      <p><strong>Date:</strong> ${req.body.date}</p>
-      <p><strong>Client Emergency Contact:</strong> ${req.body.clientEmergencyContact}</p>
-      <p><strong>Supervisor Name:</strong> ${req.body.supervisorName}</p>
-      <p><strong>Representative Company:</strong> ${req.body.representativeCompany}</p>
-      <p><strong>Representative Emergency Contact:</strong> ${req.body.representativeEmergencyContact}</p>
+   const html = `
+  <h2 style="text-align:center;">SITE SPECIFIC HAZARD ASSESSMENT</h2>
+  <table style="width:100%; border-collapse:collapse; margin-bottom:20px;">
+    <tr style="background:#f2f2f2;">
+      <td style="border:1px solid #000; padding:8px;"><strong>Company/Client:</strong> ${req.body.company}</td>
+      <td style="border:1px solid #000; padding:8px;"><strong>Job Description:</strong> ${req.body.jobDescription}</td>
+    </tr>
+    <tr>
+      <td style="border:1px solid #000; padding:8px;"><strong>Location/L.S.D.:</strong> ${req.body.location}</td>
+      <td style="border:1px solid #000; padding:8px;"><strong>Date:</strong> ${req.body.date}</td>
+    </tr>
+    <tr>
+      <td style="border:1px solid #000; padding:8px;"><strong>Client Emergency Contact:</strong> ${req.body.clientEmergencyContact}</td>
+      <td style="border:1px solid #000; padding:8px;"><strong>Supervisor Name:</strong> ${req.body.supervisorName}</td>
+    </tr>
+    <tr>
+      <td style="border:1px solid #000; padding:8px;"><strong>Representative Company:</strong> ${req.body.representativeCompany}</td>
+      <td style="border:1px solid #000; padding:8px;"><strong>Representative Emergency Contact:</strong> ${req.body.representativeEmergencyContact}</td>
+    </tr>
+  </table>
 
-      <hr/>
-
-      <h3>Hazards and Controls</h3>
-      ${Object.entries(req.body.hazardControls || {})
-        .map(([hazard, controls]) => `
-          <p><strong>${hazard}:</strong> ${controls.join(", ")}</p>
-        `).join("")}
-
-      <h3>PPE Required</h3>
-      <p>${(req.body.ppe || []).join(", ")}</p>
-
-      <h3>Additional Hazards</h3>
-      <p>${req.body.additionalHazards}</p>
-      <h3>Additional Controls</h3>
-      <p>${req.body.additionalControls}</p>
-
-      <h3>Tailgate / Safety Meeting</h3>
-      <p>${req.body.tailgateMeeting}</p>
-
-      <h3>Representatives</h3>
-      <ul>
-        ${(req.body.representatives || []).map(r => `<li>${r}</li>`).join("")}
-      </ul>
-
-      <hr/>
-
-      <h3>Signatures</h3>
-      <table style="width:100%; text-align:center; border-collapse:collapse;">
+  <h3>Hazards and Controls</h3>
+  <table style="width:100%; border-collapse:collapse; margin-bottom:20px;">
+    <tr style="background:#d9d9d9;">
+      <th style="border:1px solid #000; padding:6px;">Hazard</th>
+      <th style="border:1px solid #000; padding:6px;">Controls</th>
+    </tr>
+    ${Object.entries(req.body.hazardControls || {})
+      .map(([hazard, controls]) => `
         <tr>
-          <td style="border:1px solid #ccc; padding:10px;">
-            <strong>Worker</strong><br/>
-            <img src="${req.body.workerSignature}" alt="Worker Signature" style="max-height:80px;"/><br/>
-          </td>
-          <td style="border:1px solid #ccc; padding:10px;">
-            <strong>Client</strong><br/>
-            <img src="${req.body.clientSignature}" alt="Client Signature" style="max-height:80px;"/><br/>
-            <small>Contact: ${req.body.clientContactNumber}</small>
-          </td>
-          <td style="border:1px solid #ccc; padding:10px;">
-            <strong>Supervisor</strong><br/>
-            <img src="${req.body.supervisorSignature}" alt="Supervisor Signature" style="max-height:80px;"/><br/>
-            <small>Contact: ${req.body.supervisorContactNumber}</small>
-          </td>
+          <td style="border:1px solid #000; padding:6px;">${hazard}</td>
+          <td style="border:1px solid #000; padding:6px;">${controls.join(", ")}</td>
         </tr>
-      </table>
-    `;
+      `).join("")}
+  </table>
+
+  <h3>PPE Required</h3>
+  <p>${(req.body.ppe || []).join(", ")}</p>
+
+  <h3>Additional Hazards</h3>
+  <p>${req.body.additionalHazards}</p>
+
+  <h3>Additional Controls</h3>
+  <p>${req.body.additionalControls}</p>
+
+  <h3>Tailgate / Safety Meeting</h3>
+  <p>${req.body.tailgateMeeting}</p>
+
+  <h3>Representatives</h3>
+  <ul>
+    ${(req.body.representatives || []).map(r => `<li>${r}</li>`).join("")}
+  </ul>
+
+   <!-- NEW ACKNOWLEDGEMENT STATEMENT -->
+  <h3>Acknowledgement</h3>
+  <p>
+    I acknowledge that I have participated in the hazard assessment and understand the hazards,
+    controls, and PPE requirements for this job. I agree to follow all safety procedures and
+    use the required protective equipment.
+  </p>
+
+  <h3>Signatures</h3>
+  <table style="width:100%; border-collapse:collapse; text-align:center;">
+    <tr>
+      <td style="border:1px solid #000; padding:10px;">
+        <strong>Worker</strong><br/>
+        <img src="${req.body.workerSignature}" style="max-height:80px;"/><br/>
+      </td>
+      <td style="border:1px solid #000; padding:10px;">
+        <strong>Client</strong><br/>
+        <img src="${req.body.clientSignature}" style="max-height:80px;"/><br/>
+        <small>Contact: ${req.body.clientContactNumber}</small>
+      </td>
+      <td style="border:1px solid #000; padding:10px;">
+        <strong>Supervisor</strong><br/>
+        <img src="${req.body.supervisorSignature}" style="max-height:80px;"/><br/>
+        <small>Contact: ${req.body.supervisorContactNumber}</small>
+      </td>
+    </tr>
+  </table>
+`;
 
     // Send email via Brevo
     await sendEmail({
