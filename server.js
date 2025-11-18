@@ -69,14 +69,45 @@ app.post("/submit-form", async (req, res) => {
 
     // Send notification email via Brevo
     await sendEmail({
-      to: process.env.NOTIFY_TO,
-      subject: `Hazard Assessment Form ${formNumber}`,
-      html: `<h2>Site Specific Hazard Assessment</h2>
-             <p><strong>Company:</strong> ${formData.company}</p>
-             <p><strong>Job Description:</strong> ${formData.jobDescription}</p>
-             <p><strong>Location:</strong> ${formData.location}</p>
-             <p><strong>Date:</strong> ${formData.date}</p>`
-    });
+  to: process.env.NOTIFY_TO,
+  subject: `Hazard Assessment Form ${formNumber}`,
+  html: `
+    <h2>Site Specific Hazard Assessment</h2>
+    <p><strong>Company:</strong> ${formData.company}</p>
+    <p><strong>Job Description:</strong> ${formData.jobDescription}</p>
+    <p><strong>Location:</strong> ${formData.location}</p>
+    <p><strong>Date:</strong> ${formData.date}</p>
+    <p><strong>Client Emergency Contact:</strong> ${formData.clientEmergencyContact}</p>
+
+    <hr/>
+
+    <h3>Client & Supervisor</h3>
+    <p><strong>Client:</strong> ${formData.clientName}</p>
+    <p><strong>Supervisor:</strong> ${formData.supervisorName}</p>
+
+    <hr/>
+
+    <h3>Signatures</h3>
+    <table style="width:100%; text-align:center; border-collapse:collapse;">
+      <tr>
+        <td style="border:1px solid #ccc; padding:10px;">
+          <strong>Worker</strong><br/>
+          <img src="${formData.workerSignature}" alt="Worker Signature" style="max-height:80px;"/><br/>
+        </td>
+        <td style="border:1px solid #ccc; padding:10px;">
+          <strong>Client</strong><br/>
+          <img src="${formData.clientSignature}" alt="Client Signature" style="max-height:80px;"/><br/>
+          <small>Contact: ${formData.clientContactNumber}</small>
+        </td>
+        <td style="border:1px solid #ccc; padding:10px;">
+          <strong>Supervisor</strong><br/>
+          <img src="${formData.supervisorSignature}" alt="Supervisor Signature" style="max-height:80px;"/><br/>
+          <small>Contact: ${formData.representativeEmergencyContact}</small>
+        </td>
+      </tr>
+    </table>
+  `
+});
 
     res.json({ success: true, formNumber });
   } catch (err) {
