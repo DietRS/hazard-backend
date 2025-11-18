@@ -35,7 +35,7 @@ const transporter = nodemailer.createTransport({
 
 // ✅ Health check route
 app.get("/health", (req, res) => {
-  res.send("Backend is running on Vercel");
+  res.send("Backend is running on Render");
 });
 
 // ✅ Hazard form submission route
@@ -74,7 +74,7 @@ app.post('/submit-form', async (req, res) => {
 
     const saved = await doc.save();
 
-    // Build email
+    // ✅ Build email with defensive checks
     const mailOptions = {
       from: process.env.GMAIL_USER,
       to: process.env.NOTIFY_TO || process.env.GMAIL_USER,
@@ -86,44 +86,49 @@ app.post('/submit-form', async (req, res) => {
         <p><strong>Location:</strong> ${location}</p>
         <p><strong>Date:</strong> ${date}</p>
 
-        <h3>Hazards and Controls</h3>
-        <ul>
-          ${hazards.map(hazard => `
-            <li>
-              <strong>${hazard}</strong>
-              ${hazardControls[hazard] && hazardControls[hazard].length > 0
-                ? `<ul>${hazardControls[hazard].map(c => `<li>${c}</li>`).join('')}</ul>`
-                : ''
-              }
-            </li>
-          `).join('')}
-        </ul>
+        ${hazards && hazards.length > 0 ? `
+          <h3>Hazards and Controls</h3>
+          <ul>
+            ${hazards.map(hazard => `
+              <li>
+                <strong>${hazard}</strong>
+                ${hazardControls && hazardControls[hazard] && hazardControls[hazard].length > 0
+                  ? `<ul>${hazardControls[hazard].map(c => `<li>${c}</li>`).join('')}</ul>`
+                  : ''
+                }
+              </li>
+            `).join('')}
+          </ul>
+        ` : ''}
 
-        <h3>PPE Required</h3>
-        <ul>${ppe.map(p => `<li>${p}</li>`).join('')}</ul>
+        ${ppe && ppe.length > 0 ? `
+          <h3>PPE Required</h3>
+          <ul>${ppe.map(p => `<li>${p}</li>`).join('')}</ul>
+        ` : ''}
 
-        <h3>Additional Hazards</h3>
-        <p>${additionalHazards}</p>
+        ${additionalHazards ? `<h3>Additional Hazards</h3><p>${additionalHazards}</p>` : ''}
+        ${additionalControls ? `<h3>Additional Controls</h3><p>${additionalControls}</p>` : ''}
+        ${tailgateMeeting ? `<h3>Tailgate / Safety Meeting</h3><p>${tailgateMeeting}</p>` : ''}
 
-        <h3>Additional Controls</h3>
-        <p>${additionalControls}</p>
+        ${representatives && representatives.length > 0 ? `
+          <h3>PowerServ Representatives</h3>
+          <ul>${representatives.map(r => `<li>${r}</li>`).join('')}</ul>
+          <p><strong>Representative Emergency Contact #:</strong> ${representativeEmergencyContact}</p>
+          ${workerSignature ? `<img src="${workerSignature}" alt="Representative Signature" style="border:1px solid #000; width:200px;" />` : ''}
+        ` : ''}
 
-        <h3>Tailgate / Safety Meeting</h3>
-        <p>${tailgateMeeting}</p>
+        ${clientName ? `
+          <h3>Client</h3>
+          <p>${clientName}</p>
+          <p><strong>Client Emergency Contact #:</strong> ${clientEmergencyContact}</p>
+          ${clientSignature ? `<img src="${clientSignature}" alt="Client Signature" style="border:1px solid #000; width:200px;" />` : ''}
+        ` : ''}
 
-        <h3>PowerServ Representatives</h3>
-        <ul>${representatives.map(r => `<li>${r}</li>`).join('')}</ul>
-        <p><strong>Representative Emergency Contact #:</strong> ${representativeEmergencyContact}</p>
-        ${workerSignature ? `<img src="${workerSignature}" alt="Representative Signature" style="border:1px solid #000; width:200px;" />` : ''}
-
-        <h3>Client</h3>
-        <p>${clientName}</p>
-        <p><strong>Client Emergency Contact #:</strong> ${clientEmergencyContact}</p>
-        ${clientSignature ? `<img src="${clientSignature}" alt="Client Signature" style="border:1px solid #000; width:200px;" />` : ''}
-
-        <h3>Supervisor</h3>
-        <p>${supervisorName}</p>
-        ${supervisorSignature ? `<img src="${supervisorSignature}" alt="Supervisor Signature" style="border:1px solid #000; width:200px;" />` : ''}
+        ${supervisorName ? `
+          <h3>Supervisor</h3>
+          <p>${supervisorName}</p>
+          ${supervisorSignature ? `<img src="${supervisorSignature}" alt="Supervisor Signature" style="border:1px solid #000; width:200px;" />` : ''}
+        ` : ''}
       `
     };
 
@@ -131,15 +136,13 @@ app.post('/submit-form', async (req, res) => {
 
     res.status(200).json({ success: true, formNumber, id: saved._id.toString() });
   } catch (err) {
-    console.error('❌ Error in /submit-form:', err); // full error for debugging
+    console.error('❌ Error in /submit-form:', err);
     res.status(500).json({ success: false, error: 'Server error' });
   }
 });
 
-// ✅ Health check route
-app.get("/health", (req, res) => {
-  res.send("Backend is running on Vercel");
+// ✅ Render requires app.listen
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+  console.log(`🚀 HazardApp backend running on port ${PORT}`);
 });
-
-// ✅ Export for Vercel
-module.exports = app;
