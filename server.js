@@ -3,7 +3,7 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
-const nodemailer = require("nodemailer");
+const axios = require("axios");   // ✅ Brevo API
 const HazardForm = require("./models/HazardForm");
 
 const app = express();
@@ -18,42 +18,44 @@ app.use(cors({
   methods: ["GET", "POST"]
 }));
 
-// Debug logging middleware
+// Debug logging
 app.use((req, res, next) => {
   console.log(`➡️ ${req.method} ${req.url}`);
   next();
 });
 
-// ✅ Health check route
+// Health check
 app.get("/health", (req, res) => {
   res.send("Backend is running on Render");
 });
 
-// ✅ Debug route to confirm frontend → backend connection
+// Ping route
 app.get("/ping", (req, res) => {
   console.log("✅ Ping received from frontend");
   res.json({ message: "Backend is reachable" });
 });
 
+// ✅ Brevo email helper
+async function sendEmail({ to, subject, html }) {
+  try {
+    await axios.post("https://api.brevo.com/v3/smtp/email", {
+      sender: { email: process.env.NOTIFY_FROM },   // must be verified in Brevo
+      to: [{ email: to }],
+      subject,
+      htmlContent: html
+    }, {
+      headers: { "api-key": process.env.BREVO_API_KEY }
+    });
+    console.log("✅ Email sent via Brevo");
+  } catch (err) {
+    console.error("❌ Error sending email via Brevo:", err.response?.data || err.message);
+  }
+}
+
 // ✅ Hazard form submission route
 app.post("/submit-form", async (req, res) => {
   try {
-    const {
-      company, location, jobDescription, date,
-      hazards = [], hazardControls = {},
-      ppe = [], additionalHazards = "", additionalControls = "",
-      tailgateMeeting = "",
-      representatives = [],
-      representativeEmergencyContact = "",
-      clientEmergencyContact = "",
-      workerSignature = "",
-      clientName = "", clientSignature = "",
-      supervisorName = "", supervisorSignature = ""
-    } = req.body;
-
-    if (!company || !location || !jobDescription || !date) {
-      return res.status(400).json({ success: false, error: "Missing required fields" });
-    }
+    const formData = req.body;
 
     // Generate unique form number
     const today = new Date();
@@ -61,55 +63,35 @@ app.post("/submit-form", async (req, res) => {
     const formNumber = `${ymd}-${Math.floor(Math.random() * 9000 + 1000)}`;
 
     // Save to MongoDB
-    const doc = new HazardForm({
-      formNumber, company, location, jobDescription, date,
-      hazards, hazardControls, ppe, additionalHazards, additionalControls,
-      tailgateMeeting, representatives,
-      representativeEmergencyContact, clientEmergencyContact,
-      workerSignature, clientName, clientSignature, supervisorName, supervisorSignature
-    });
-
-    const saved = await doc.save();
+    const hazardForm = new HazardForm({ ...formData, formNumber });
+    await hazardForm.save();
     console.log("✅ Form saved to MongoDB");
 
-    // Send email
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_PASS }
-    });
-
-    await transporter.sendMail({
-      from: process.env.GMAIL_USER,
-      to: process.env.NOTIFY_TO || process.env.GMAIL_USER,
+    // Send notification email via Brevo
+    await sendEmail({
+      to: process.env.NOTIFY_TO,
       subject: `Hazard Assessment Form ${formNumber}`,
       html: `<h2>Site Specific Hazard Assessment</h2>
-             <p><strong>Company:</strong> ${company}</p>
-             <p><strong>Job Description:</strong> ${jobDescription}</p>
-             <p><strong>Location:</strong> ${location}</p>
-             <p><strong>Date:</strong> ${date}</p>`
+             <p><strong>Company:</strong> ${formData.company}</p>
+             <p><strong>Job Description:</strong> ${formData.jobDescription}</p>
+             <p><strong>Location:</strong> ${formData.location}</p>
+             <p><strong>Date:</strong> ${formData.date}</p>`
     });
 
-    console.log("✅ Email sent");
-    res.status(200).json({ success: true, formNumber, id: saved._id.toString() });
-
+    res.json({ success: true, formNumber });
   } catch (err) {
     console.error("❌ Error in /submit-form:", err);
-    res.status(500).json({ success: false, error: "Server error" });
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// ✅ MongoDB connection
+// MongoDB connection
 mongoose.connect(process.env.MONGO_URI, {
   useNewUrlParser: true,
-  useUnifiedTopology: true,
-  ssl: true,
-  serverSelectionTimeoutMS: 30000
-})
-.then(() => console.log("✅ MongoDB connected"))
-.catch(err => console.error("❌ MongoDB connection error:", err));
+  useUnifiedTopology: true
+}).then(() => console.log("✅ Connected to MongoDB"))
+  .catch(err => console.error("❌ MongoDB connection error:", err));
 
-// ✅ Start server
-const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => {
-  console.log(`🚀 HazardApp backend running on port ${PORT}`);
-});
+// Start server
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
