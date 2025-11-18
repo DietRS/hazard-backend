@@ -55,64 +55,91 @@ async function sendEmail({ to, subject, html }) {
 // ✅ Hazard form submission route
 app.post("/submit-form", async (req, res) => {
   try {
-    const formData = req.body;
+    // Extract representative company prefix
+    const prefix = (req.body.representativeCompany || "GEN")
+      .substring(0, 3)
+      .toUpperCase();
 
-    // Generate unique form number
-    const today = new Date();
-    const ymd = `${today.getFullYear()}${String(today.getMonth()+1).padStart(2,"0")}${String(today.getDate()).padStart(2,"0")}`;
-    const formNumber = `${ymd}-${Math.floor(Math.random() * 9000 + 1000)}`;
+    // Generate unique form number with prefix
+    const formNumber = `${prefix}-${Date.now()}`;
 
     // Save to MongoDB
-    const hazardForm = new HazardForm({ ...formData, formNumber });
+    const hazardForm = new HazardForm({
+      ...req.body,
+      formNumber
+    });
     await hazardForm.save();
-    console.log("✅ Form saved to MongoDB");
 
-    // Send notification email via Brevo
+    // Build email HTML
+    const html = `
+      <h2>Site Specific Hazard Assessment</h2>
+      <p><strong>Company:</strong> ${req.body.company}</p>
+      <p><strong>Job Description:</strong> ${req.body.jobDescription}</p>
+      <p><strong>Location:</strong> ${req.body.location}</p>
+      <p><strong>Date:</strong> ${req.body.date}</p>
+      <p><strong>Client Emergency Contact:</strong> ${req.body.clientEmergencyContact}</p>
+      <p><strong>Supervisor Name:</strong> ${req.body.supervisorName}</p>
+      <p><strong>Representative Company:</strong> ${req.body.representativeCompany}</p>
+      <p><strong>Representative Emergency Contact:</strong> ${req.body.representativeEmergencyContact}</p>
+
+      <hr/>
+
+      <h3>Hazards and Controls</h3>
+      ${Object.entries(req.body.hazardControls || {})
+        .map(([hazard, controls]) => `
+          <p><strong>${hazard}:</strong> ${controls.join(", ")}</p>
+        `).join("")}
+
+      <h3>PPE Required</h3>
+      <p>${(req.body.ppe || []).join(", ")}</p>
+
+      <h3>Additional Hazards</h3>
+      <p>${req.body.additionalHazards}</p>
+      <h3>Additional Controls</h3>
+      <p>${req.body.additionalControls}</p>
+
+      <h3>Tailgate / Safety Meeting</h3>
+      <p>${req.body.tailgateMeeting}</p>
+
+      <h3>Representatives</h3>
+      <ul>
+        ${(req.body.representatives || []).map(r => `<li>${r}</li>`).join("")}
+      </ul>
+
+      <hr/>
+
+      <h3>Signatures</h3>
+      <table style="width:100%; text-align:center; border-collapse:collapse;">
+        <tr>
+          <td style="border:1px solid #ccc; padding:10px;">
+            <strong>Worker</strong><br/>
+            <img src="${req.body.workerSignature}" alt="Worker Signature" style="max-height:80px;"/><br/>
+          </td>
+          <td style="border:1px solid #ccc; padding:10px;">
+            <strong>Client</strong><br/>
+            <img src="${req.body.clientSignature}" alt="Client Signature" style="max-height:80px;"/><br/>
+            <small>Contact: ${req.body.clientContactNumber}</small>
+          </td>
+          <td style="border:1px solid #ccc; padding:10px;">
+            <strong>Supervisor</strong><br/>
+            <img src="${req.body.supervisorSignature}" alt="Supervisor Signature" style="max-height:80px;"/><br/>
+            <small>Contact: ${req.body.supervisorContactNumber}</small>
+          </td>
+        </tr>
+      </table>
+    `;
+
+    // Send email via Brevo
     await sendEmail({
-  to: process.env.NOTIFY_TO,
-  subject: `Hazard Assessment Form ${formNumber}`,
-  html: `
-    <h2>Site Specific Hazard Assessment</h2>
-    <p><strong>Company:</strong> ${formData.company}</p>
-    <p><strong>Job Description:</strong> ${formData.jobDescription}</p>
-    <p><strong>Location:</strong> ${formData.location}</p>
-    <p><strong>Date:</strong> ${formData.date}</p>
-    <p><strong>Client Emergency Contact:</strong> ${formData.clientEmergencyContact}</p>
-
-    <hr/>
-
-    <h3>Client & Supervisor</h3>
-    <p><strong>Client:</strong> ${formData.clientName}</p>
-    <p><strong>Supervisor:</strong> ${formData.supervisorName}</p>
-
-    <hr/>
-
-    <h3>Signatures</h3>
-    <table style="width:100%; text-align:center; border-collapse:collapse;">
-      <tr>
-        <td style="border:1px solid #ccc; padding:10px;">
-          <strong>Worker</strong><br/>
-          <img src="${formData.workerSignature}" alt="Worker Signature" style="max-height:80px;"/><br/>
-        </td>
-        <td style="border:1px solid #ccc; padding:10px;">
-          <strong>Client</strong><br/>
-          <img src="${formData.clientSignature}" alt="Client Signature" style="max-height:80px;"/><br/>
-          <small>Contact: ${formData.clientContactNumber}</small>
-        </td>
-        <td style="border:1px solid #ccc; padding:10px;">
-          <strong>Supervisor</strong><br/>
-          <img src="${formData.supervisorSignature}" alt="Supervisor Signature" style="max-height:80px;"/><br/>
-          <small>Contact: ${formData.representativeEmergencyContact}</small>
-        </td>
-      </tr>
-    </table>
-  `
-});
+      to: process.env.NOTIFY_TO,
+      subject: `Hazard Assessment Form ${formNumber}`,
+      html
+    });
 
     res.json({ success: true, formNumber });
   } catch (err) {
-    console.error("❌ Error in /submit-form:", err);
-    res.status(500).json({ success: false, error: err.message });
+    console.error("❌ Error submitting form:", err);
+    res.status(500).json({ success: false, error: "Submission failed" });
   }
 });
 

@@ -18,7 +18,8 @@ const hazardFormSchema = new mongoose.Schema({
   tailgateMeeting: { type: String, default: '' },
   representatives: { type: [String], default: [] },
 
-  // Emergency contacts
+  // Representative company + emergency contacts
+  representativeCompany: { type: String, default: '' },   // NEW FIELD
   representativeEmergencyContact: { type: String, default: '' },
   clientEmergencyContact: { type: String, default: '' },
 
