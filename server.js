@@ -24,6 +24,11 @@ app.use((req, res, next) => {
   next();
 });
 
+// Root route
+app.get("/", (req, res) => {
+  res.send("✅ Hazard backend root is alive");
+});
+
 // Health check
 app.get("/health", (req, res) => {
   res.send("Backend is running on Render");
