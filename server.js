@@ -3,7 +3,7 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
-const axios = require("axios");   // ✅ Brevo API
+const nodemailer = require("nodemailer");   // ✅ Outlook SMTP
 const HazardForm = require("./models/HazardForm");
 
 const app = express();
@@ -35,20 +35,26 @@ app.get("/ping", (req, res) => {
   res.json({ message: "Backend is reachable" });
 });
 
-// ✅ Brevo email helper
+// ✅ Outlook email helper
+const transporter = nodemailer.createTransport({
+  service: "Outlook",
+  auth: {
+    user: process.env.EMAIL_USER,   // sitehazard@outlook.com
+    pass: process.env.EMAIL_PASS    // oaesixnzkmrtncnx
+  }
+});
+
 async function sendEmail({ to, subject, html }) {
   try {
-    await axios.post("https://api.brevo.com/v3/smtp/email", {
-      sender: { email: process.env.NOTIFY_FROM },   // must be verified in Brevo
-      to: [{ email: to }],
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to,
       subject,
-      htmlContent: html
-    }, {
-      headers: { "api-key": process.env.BREVO_API_KEY }
+      html
     });
-    console.log("✅ Email sent via Brevo");
+    console.log("✅ Email sent via Outlook SMTP");
   } catch (err) {
-    console.error("❌ Error sending email via Brevo:", err.response?.data || err.message);
+    console.error("❌ Error sending email via Outlook:", err.message);
   }
 }
 
@@ -145,7 +151,7 @@ app.post("/submit-form", async (req, res) => {
     `;
 
     await sendEmail({
-      to: process.env.NOTIFY_TO,
+      to: process.env.NOTIFY_TO,   // sitehazardassesment@gmail.com
       subject: `Hazard Assessment Form ${formNumber}`,
       html
     });
